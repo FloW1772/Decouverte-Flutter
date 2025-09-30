@@ -1,0 +1,51 @@
+# Flutter/Dart
+.dart_tool/
+.buildlog/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+ios/Flutter/Flutter.podspec
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+macos/Flutter/Flutter.framework
+macos/Flutter/ephemeral/
+linux/flutter/ephemeral/
+windows/flutter/ephemeral/
+web/.dart_tool/
+
+# Generated plugin registrant
+**/GeneratedPluginRegistrant.*
+
+# Objets temporaires
+*.lock
+*.log
+*.tmp
+*.swp
+
+# IDEs
+## Android Studio
+.idea/
+*.iml
+*.ipr
+*.iws
+
+## VS Code
+.vscode/
+
+# Files for MacOS
+.DS_Store
+*.DS_Store
+
+# Files for Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Packages
+.packages
+.pub/
