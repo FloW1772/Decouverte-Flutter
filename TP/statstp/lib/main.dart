@@ -85,7 +85,14 @@ class _HomePageState extends State<HomePage> {
               projet.desc,
               style: const TextStyle(color: Colors.white70),
             ),
-            trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white),
+            trailing: IconButton(
+              icon: const Icon(Icons.close, color: Colors.red),
+              onPressed: () {
+                setState(() {
+                  _projets.removeAt(index);
+                });
+              },
+            ),
           ),
         );
       },
