@@ -53,7 +53,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
-  int _counter = 3;
 
   final List<Projet> _projets = [
     Projet("Projet Mannhattan", "un projet vraiment énorme",
@@ -65,15 +64,6 @@ class _HomePageState extends State<HomePage> {
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
-    });
-  }
-
-  void _addProjectAuto() {
-    setState(() {
-      _projets.add(
-        Projet("Projet n°$_counter", "Un projet ajouté automatiquement"),
-      );
-      _counter++;
     });
   }
 
@@ -145,13 +135,7 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: Colors.indigo,
       ),
       body: pages[_selectedIndex],
-      floatingActionButton: _selectedIndex == 0
-          ? FloatingActionButton(
-        onPressed: _addProjectAuto,
-        backgroundColor: Colors.indigo,
-        child: const Icon(Icons.add, color: Colors.white),
-      )
-          : null,
+      // 🔴 Bouton flottant supprimé
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
@@ -263,9 +247,14 @@ class _ContributionPageState extends State<ContributionPage> {
               ],
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: _submitForm,
-              child: const Text("Créer le projet"),
+              icon: const Icon(Icons.check),
+              label: const Text("Créer le projet"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.indigo,
+                foregroundColor: Colors.white,
+              ),
             )
           ],
         ),
