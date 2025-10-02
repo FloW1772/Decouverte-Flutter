@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'main.dart'; // pour accéder à HomePage, Projet
-// Si ProjectDetailsPage est aussi dans main.dart :
+import 'main.dart';
 import 'main.dart';
 
 final GoRouter appRouter = GoRouter(

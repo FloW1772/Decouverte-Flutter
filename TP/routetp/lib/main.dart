@@ -49,7 +49,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// Page d’accueil
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -163,7 +162,6 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-/// Page de détails projet
 class ProjectDetailsPage extends StatelessWidget {
   final Projet projet;
 
@@ -225,7 +223,6 @@ class ProjectDetailsPage extends StatelessWidget {
   }
 }
 
-/// Formulaire réutilisé pour éditer un projet
 class ContributionFormEdit extends StatefulWidget {
   final Projet projet;
   const ContributionFormEdit({super.key, required this.projet});
@@ -351,7 +348,6 @@ class _ContributionFormEditState extends State<ContributionFormEdit> {
   }
 }
 
-/// Page Contribution (ajout)
 class ContributionPage extends StatefulWidget {
   final Function(Projet) onProjectCreated;
 
