@@ -1,9 +1,33 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'app_router.dart'; // ✅ Router séparé
 
 /// Enum pour les statuts du projet
 enum ProjetStatus { enCours, termine, aVenir }
+
+/// Classe Task
+class Task {
+  String name;
+  bool isCompleted;
+  List<String> details;
+
+  Task({
+    required this.name,
+    required this.isCompleted,
+    this.details = const [],
+  });
+
+  /// Factory pour créer une Task depuis un JSON
+  factory Task.fromJson(Map<String, dynamic> json) {
+    return Task(
+      name: json['title'] ?? 'Sans titre',
+      isCompleted: json['completed'] ?? false,
+      details: ["Tâche ID: ${json['id']}"],
+    );
+  }
+}
 
 /// Classe Projet
 class Projet {
@@ -11,6 +35,8 @@ class Projet {
   String _desc;
   ProjetStatus _status;
   DateTime? _date;
+
+  List<Task> tasks = []; // ✅ Liste des tâches
 
   Projet(this._title, this._desc,
       {ProjetStatus status = ProjetStatus.aVenir, DateTime? date})
@@ -26,6 +52,21 @@ class Projet {
   set desc(String d) => _desc = d;
   set status(ProjetStatus s) => _status = s;
   set date(DateTime? d) => _date = d;
+
+  /// ✅ Méthode pour charger les tâches depuis l’API
+  Future<void> initTasks() async {
+    if (tasks.isNotEmpty) return;
+
+    final url = Uri.parse("https://jsonplaceholder.typicode.com/users/1/todos");
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      tasks = data.map((json) => Task.fromJson(json)).toList();
+    } else {
+      throw Exception("Erreur lors du chargement des tâches");
+    }
+  }
 }
 
 void main() {
@@ -60,7 +101,7 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
 
   final List<Projet> _projets = [
-    Projet("Projet Mannhattan", "un projet vraiment énorme",
+    Projet("Projet Manhattan", "un projet vraiment énorme",
         status: ProjetStatus.enCours, date: DateTime(2024, 1, 1)),
     Projet("Projet important", "un projet très important",
         status: ProjetStatus.termine, date: DateTime(2023, 12, 15)),
@@ -162,30 +203,45 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class ProjectDetailsPage extends StatelessWidget {
+class ProjectDetailsPage extends StatefulWidget {
   final Projet projet;
 
   const ProjectDetailsPage({super.key, required this.projet});
 
   @override
+  State<ProjectDetailsPage> createState() => _ProjectDetailsPageState();
+}
+
+class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTasks();
+  }
+
+  Future<void> _loadTasks() async {
+    try {
+      await widget.projet.initTasks();
+    } catch (e) {
+      debugPrint("Erreur : $e");
+    }
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final projet = widget.projet;
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         appBar: AppBar(
           title: Text(projet.title),
           backgroundColor: Colors.indigo,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text("Allez dans l’onglet Éditer pour modifier")),
-                );
-              },
-            )
-          ],
           bottom: const TabBar(
             tabs: [
               Tab(text: "Détails"),
@@ -195,7 +251,7 @@ class ProjectDetailsPage extends StatelessWidget {
         ),
         body: TabBarView(
           children: [
-            // Détails
+            // Onglet Détails
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -211,10 +267,35 @@ class ProjectDetailsPage extends StatelessWidget {
                   Text(projet.date != null
                       ? "Date début : ${projet.date!.toLocal().toString().split(' ')[0]}"
                       : "Pas de date définie"),
+                  const SizedBox(height: 16),
+
+                  // ✅ Liste des tâches
+                  const Text("Tâches :", style: TextStyle(fontSize: 18)),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: _isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : ListView.builder(
+                      itemCount: projet.tasks.length,
+                      itemBuilder: (context, index) {
+                        final task = projet.tasks[index];
+                        return CheckboxListTile(
+                          value: task.isCompleted,
+                          title: Text(task.name),
+                          subtitle: Text(task.details.join(", ")),
+                          onChanged: (val) {
+                            setState(() {
+                              task.isCompleted = val ?? false;
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
                 ],
               ),
             ),
-            // Formulaire de modification
+            // Onglet Éditer
             ContributionFormEdit(projet: projet),
           ],
         ),
@@ -402,8 +483,9 @@ class _ContributionPageState extends State<ContributionPage> {
             ),
             TextFormField(
               decoration: const InputDecoration(labelText: "Description"),
-              validator: (value) =>
-              value == null || value.isEmpty ? "Description requise" : null,
+              validator: (value) => value == null || value.isEmpty
+                  ? "Description requise"
+                  : null,
               onSaved: (value) => _desc = value!,
             ),
             const SizedBox(height: 16),
