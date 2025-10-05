@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
-import 'app_router.dart'; // ✅ Router séparé
 
 /// Enum pour les statuts du projet
 enum ProjetStatus { enCours, termine, aVenir }
@@ -15,11 +14,10 @@ class Task {
 
   Task({
     required this.name,
-    required this.isCompleted,
+    this.isCompleted = false,
     this.details = const [],
   });
 
-  /// Factory pour créer une Task depuis un JSON
   factory Task.fromJson(Map<String, dynamic> json) {
     return Task(
       name: json['title'] ?? 'Sans titre',
@@ -35,8 +33,7 @@ class Projet {
   String _desc;
   ProjetStatus _status;
   DateTime? _date;
-
-  List<Task> tasks = []; // ✅ Liste des tâches
+  List<Task> tasks = [];
 
   Projet(this._title, this._desc,
       {ProjetStatus status = ProjetStatus.aVenir, DateTime? date})
@@ -53,13 +50,11 @@ class Projet {
   set status(ProjetStatus s) => _status = s;
   set date(DateTime? d) => _date = d;
 
-  /// ✅ Méthode pour charger les tâches depuis l’API
+  /// Méthode pour charger les tâches depuis l’API
   Future<void> initTasks() async {
     if (tasks.isNotEmpty) return;
-
     final url = Uri.parse("https://jsonplaceholder.typicode.com/users/1/todos");
     final response = await http.get(url);
-
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       tasks = data.map((json) => Task.fromJson(json)).toList();
@@ -78,13 +73,30 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // On crée le router ici (evite l'import circulaire avec un fichier séparé)
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const HomePage(),
+        ),
+        GoRoute(
+          path: '/details',
+          builder: (context, state) {
+            final projet = state.extra as Projet;
+            return ProjectDetailsPage(projet: projet);
+          },
+        ),
+      ],
+    );
+
     return MaterialApp.router(
       title: 'Mes Projets',
       theme: ThemeData(
         primarySwatch: Colors.indigo,
         scaffoldBackgroundColor: const Color(0xffeceaea),
       ),
-      routerConfig: appRouter, // ✅ utilisation du router séparé
+      routerConfig: router,
       debugShowCheckedModeBanner: false,
     );
   }
@@ -156,7 +168,6 @@ class _HomePageState extends State<HomePage> {
               },
             ),
             onTap: () {
-              // 👉 Navigation vers la page détails
               context.push('/details', extra: projet);
             },
           ),
@@ -174,8 +185,8 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: const [
+        title: const Row(
+          children: [
             Icon(Icons.rocket_launch, color: Colors.white),
             SizedBox(width: 8),
             Text("Mes Projets"),
@@ -203,6 +214,7 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+/// Version complète de ProjectDetailsPage avec menu contextuel
 class ProjectDetailsPage extends StatefulWidget {
   final Projet projet;
 
@@ -254,7 +266,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
             // Onglet Détails
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Column(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text("Titre : ${projet.title}",
@@ -268,26 +282,107 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
                       ? "Date début : ${projet.date!.toLocal().toString().split(' ')[0]}"
                       : "Pas de date définie"),
                   const SizedBox(height: 16),
-
-                  // ✅ Liste des tâches
                   const Text("Tâches :", style: TextStyle(fontSize: 18)),
                   const SizedBox(height: 8),
                   Expanded(
-                    child: _isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : ListView.builder(
+                    child: ListView.builder(
                       itemCount: projet.tasks.length,
                       itemBuilder: (context, index) {
                         final task = projet.tasks[index];
-                        return CheckboxListTile(
-                          value: task.isCompleted,
-                          title: Text(task.name),
-                          subtitle: Text(task.details.join(", ")),
-                          onChanged: (val) {
-                            setState(() {
-                              task.isCompleted = val ?? false;
-                            });
-                          },
+                        return Card(
+                          margin: const EdgeInsets.symmetric(
+                              vertical: 6, horizontal: 0),
+                          child: ListTile(
+                            leading: Icon(
+                              task.isCompleted
+                                  ? Icons.check_circle
+                                  : Icons.circle_outlined,
+                              color: task.isCompleted
+                                  ? Colors.green
+                                  : Colors.grey,
+                            ),
+                            title: Text(
+                              task.name,
+                              style: TextStyle(
+                                decoration: task.isCompleted
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
+                            ),
+                            subtitle: task.details.isNotEmpty
+                                ? Text(task.details.join(", "))
+                                : const Text("Aucun détail"),
+                            trailing: PopupMenuButton<String>(
+                              onSelected: (value) async {
+                                if (value == 'toggle') {
+                                  setState(() {
+                                    task.isCompleted = !task.isCompleted;
+                                  });
+                                } else if (value == 'delete') {
+                                  setState(() {
+                                    projet.tasks.removeAt(index);
+                                  });
+                                } else if (value == 'add_detail') {
+                                  String? newDetail =
+                                  await showDialog<String>(
+                                    context: context,
+                                    builder: (context) {
+                                      String input = '';
+                                      return AlertDialog(
+                                        title:
+                                        const Text("Ajouter un détail"),
+                                        content: TextField(
+                                          decoration:
+                                          const InputDecoration(
+                                            hintText:
+                                            "Entrez un détail...",
+                                          ),
+                                          onChanged: (val) => input = val,
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context),
+                                            child:
+                                            const Text("Annuler"),
+                                          ),
+                                          ElevatedButton(
+                                            onPressed: () =>
+                                                Navigator.pop(
+                                                    context, input),
+                                            child:
+                                            const Text("Ajouter"),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                  if (newDetail != null &&
+                                      newDetail.isNotEmpty) {
+                                    setState(() {
+                                      task.details.add(newDetail);
+                                    });
+                                  }
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  value: 'toggle',
+                                  child: Text(task.isCompleted
+                                      ? "Restaurer la tâche"
+                                      : "Clore la tâche"),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text("Supprimer la tâche"),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'add_detail',
+                                  child: Text("Ajouter un détail"),
+                                ),
+                              ],
+                            ),
+                          ),
                         );
                       },
                     ),
@@ -304,6 +399,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
   }
 }
 
+/// Formulaire d'édition (utilisé dans l'onglet Éditer)
 class ContributionFormEdit extends StatefulWidget {
   final Projet projet;
   const ContributionFormEdit({super.key, required this.projet});
@@ -429,6 +525,7 @@ class _ContributionFormEditState extends State<ContributionFormEdit> {
   }
 }
 
+/// Page de création — reste inchangée
 class ContributionPage extends StatefulWidget {
   final Function(Projet) onProjectCreated;
 
