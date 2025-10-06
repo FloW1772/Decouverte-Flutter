@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'app_router.dart'; // ✅ Router séparé
 
 /// Enum pour les statuts du projet
 enum ProjetStatus { enCours, termine, aVenir }
@@ -14,7 +15,7 @@ class Task {
 
   Task({
     required this.name,
-    this.isCompleted = false,
+    required this.isCompleted,
     this.details = const [],
   });
 
@@ -33,6 +34,7 @@ class Projet {
   String _desc;
   ProjetStatus _status;
   DateTime? _date;
+
   List<Task> tasks = [];
 
   Projet(this._title, this._desc,
@@ -50,11 +52,12 @@ class Projet {
   set status(ProjetStatus s) => _status = s;
   set date(DateTime? d) => _date = d;
 
-  /// Méthode pour charger les tâches depuis l’API
   Future<void> initTasks() async {
     if (tasks.isNotEmpty) return;
+
     final url = Uri.parse("https://jsonplaceholder.typicode.com/users/1/todos");
     final response = await http.get(url);
+
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       tasks = data.map((json) => Task.fromJson(json)).toList();
@@ -73,30 +76,13 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // On crée le router ici (evite l'import circulaire avec un fichier séparé)
-    final router = GoRouter(
-      routes: [
-        GoRoute(
-          path: '/',
-          builder: (context, state) => const HomePage(),
-        ),
-        GoRoute(
-          path: '/details',
-          builder: (context, state) {
-            final projet = state.extra as Projet;
-            return ProjectDetailsPage(projet: projet);
-          },
-        ),
-      ],
-    );
-
     return MaterialApp.router(
       title: 'Mes Projets',
       theme: ThemeData(
         primarySwatch: Colors.indigo,
         scaffoldBackgroundColor: const Color(0xffeceaea),
       ),
-      routerConfig: router,
+      routerConfig: appRouter,
       debugShowCheckedModeBanner: false,
     );
   }
@@ -113,9 +99,9 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
 
   final List<Projet> _projets = [
-    Projet("Projet Manhattan", "un projet vraiment énorme",
+    Projet("Projet Manhattan", "Un projet vraiment énorme",
         status: ProjetStatus.enCours, date: DateTime(2024, 1, 1)),
-    Projet("Projet important", "un projet très important",
+    Projet("Projet important", "Un projet très important",
         status: ProjetStatus.termine, date: DateTime(2023, 12, 15)),
   ];
 
@@ -185,8 +171,8 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
-          children: [
+        title: Row(
+          children: const [
             Icon(Icons.rocket_launch, color: Colors.white),
             SizedBox(width: 8),
             Text("Mes Projets"),
@@ -214,7 +200,6 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-/// Version complète de ProjectDetailsPage avec menu contextuel
 class ProjectDetailsPage extends StatefulWidget {
   final Projet projet;
 
@@ -263,12 +248,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
         ),
         body: TabBarView(
           children: [
-            // Onglet Détails
             Padding(
               padding: const EdgeInsets.all(16),
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : Column(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text("Titre : ${projet.title}",
@@ -285,103 +267,103 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
                   const Text("Tâches :", style: TextStyle(fontSize: 18)),
                   const SizedBox(height: 8),
                   Expanded(
-                    child: ListView.builder(
+                    child: _isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : ListView.builder(
                       itemCount: projet.tasks.length,
                       itemBuilder: (context, index) {
                         final task = projet.tasks[index];
-                        return Card(
-                          margin: const EdgeInsets.symmetric(
-                              vertical: 6, horizontal: 0),
-                          child: ListTile(
-                            leading: Icon(
+                        return ListTile(
+                          leading: IconButton(
+                            icon: Icon(
                               task.isCompleted
                                   ? Icons.check_circle
-                                  : Icons.circle_outlined,
+                                  : Icons.radio_button_unchecked,
                               color: task.isCompleted
                                   ? Colors.green
                                   : Colors.grey,
                             ),
-                            title: Text(
-                              task.name,
-                              style: TextStyle(
-                                decoration: task.isCompleted
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                              ),
+                            onPressed: () {
+                              setState(() {
+                                task.isCompleted = !task.isCompleted;
+                              });
+                            },
+                          ),
+                          title: Text(
+                            task.name,
+                            style: TextStyle(
+                              decoration: task.isCompleted
+                                  ? TextDecoration.lineThrough
+                                  : TextDecoration.none,
                             ),
-                            subtitle: task.details.isNotEmpty
-                                ? Text(task.details.join(", "))
-                                : const Text("Aucun détail"),
-                            trailing: PopupMenuButton<String>(
-                              onSelected: (value) async {
-                                if (value == 'toggle') {
-                                  setState(() {
-                                    task.isCompleted = !task.isCompleted;
-                                  });
-                                } else if (value == 'delete') {
-                                  setState(() {
-                                    projet.tasks.removeAt(index);
-                                  });
-                                } else if (value == 'add_detail') {
-                                  String? newDetail =
-                                  await showDialog<String>(
-                                    context: context,
-                                    builder: (context) {
-                                      String input = '';
-                                      return AlertDialog(
-                                        title:
-                                        const Text("Ajouter un détail"),
-                                        content: TextField(
-                                          decoration:
-                                          const InputDecoration(
-                                            hintText:
-                                            "Entrez un détail...",
-                                          ),
-                                          onChanged: (val) => input = val,
+                          ),
+                          subtitle: Text(task.details.join(", ")),
+                          trailing: PopupMenuButton<String>(
+                            onSelected: (value) async {
+                              if (value == 'toggle') {
+                                setState(() {
+                                  task.isCompleted = !task.isCompleted;
+                                });
+                              } else if (value == 'delete') {
+                                setState(() {
+                                  projet.tasks.removeAt(index);
+                                });
+                              } else if (value == 'add_detail') {
+                                final newDetail = await showDialog<String>(
+                                  context: context,
+                                  builder: (context) {
+                                    String detail = "";
+                                    return AlertDialog(
+                                      title:
+                                      const Text("Ajouter un détail"),
+                                      content: TextField(
+                                        decoration:
+                                        const InputDecoration(
+                                          hintText:
+                                          "Entrez un détail...",
                                         ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(context),
-                                            child:
-                                            const Text("Annuler"),
-                                          ),
-                                          ElevatedButton(
-                                            onPressed: () =>
-                                                Navigator.pop(
-                                                    context, input),
-                                            child:
-                                            const Text("Ajouter"),
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  );
-                                  if (newDetail != null &&
-                                      newDetail.isNotEmpty) {
-                                    setState(() {
-                                      task.details.add(newDetail);
-                                    });
-                                  }
+                                        onChanged: (val) => detail = val,
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(
+                                              context, null),
+                                          child: const Text("Annuler"),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: () =>
+                                              Navigator.pop(
+                                                  context, detail),
+                                          child: const Text("Ajouter"),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                                if (newDetail != null &&
+                                    newDetail.isNotEmpty) {
+                                  setState(() {
+                                    task.details.add(newDetail);
+                                  });
                                 }
-                              },
-                              itemBuilder: (context) => [
-                                PopupMenuItem(
-                                  value: 'toggle',
-                                  child: Text(task.isCompleted
-                                      ? "Restaurer la tâche"
-                                      : "Clore la tâche"),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Text("Supprimer la tâche"),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'add_detail',
-                                  child: Text("Ajouter un détail"),
-                                ),
-                              ],
-                            ),
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              PopupMenuItem(
+                                value: 'toggle',
+                                child: Text(task.isCompleted
+                                    ? "Restaurer la tâche"
+                                    : "Clore la tâche"),
+                              ),
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Text("Supprimer la tâche"),
+                              ),
+                              const PopupMenuItem(
+                                value: 'add_detail',
+                                child: Text("Ajouter un détail"),
+                              ),
+                            ],
                           ),
                         );
                       },
@@ -390,7 +372,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
                 ],
               ),
             ),
-            // Onglet Éditer
             ContributionFormEdit(projet: projet),
           ],
         ),
@@ -399,7 +380,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
   }
 }
 
-/// Formulaire d'édition (utilisé dans l'onglet Éditer)
 class ContributionFormEdit extends StatefulWidget {
   final Projet projet;
   const ContributionFormEdit({super.key, required this.projet});
@@ -449,7 +429,8 @@ class _ContributionFormEditState extends State<ContributionFormEdit> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Le projet ${widget.projet.title} a été modifié")),
+        SnackBar(
+            content: Text("Le projet ${widget.projet.title} a été modifié")),
       );
     }
   }
@@ -525,7 +506,6 @@ class _ContributionFormEditState extends State<ContributionFormEdit> {
   }
 }
 
-/// Page de création — reste inchangée
 class ContributionPage extends StatefulWidget {
   final Function(Projet) onProjectCreated;
 
@@ -580,9 +560,8 @@ class _ContributionPageState extends State<ContributionPage> {
             ),
             TextFormField(
               decoration: const InputDecoration(labelText: "Description"),
-              validator: (value) => value == null || value.isEmpty
-                  ? "Description requise"
-                  : null,
+              validator: (value) =>
+              value == null || value.isEmpty ? "Description requise" : null,
               onSaved: (value) => _desc = value!,
             ),
             const SizedBox(height: 16),
